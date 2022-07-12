@@ -17,6 +17,7 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PcdLib.h>
 #include <PiPei.h>
+#include <Pi/PrePiHob.h>
 #include <Register/Amd/Msr.h>
 #include <Register/Intel/SmramSaveStateMap.h>
 #include <Library/VmgExitLib.h>
@@ -58,13 +59,17 @@ AmdSevSnpInitialize (
   ASSERT_RETURN_ERROR (PcdStatus);
 
   //
-  // Iterate through the system RAM and validate it.
+  // Iterate through the system RAM and validate it or classify it unaccepted.
   //
   for (Hob.Raw = GetHobList (); !END_OF_HOB_LIST (Hob); Hob.Raw = GET_NEXT_HOB (Hob)) {
     if ((Hob.Raw != NULL) && (GET_HOB_TYPE (Hob) == EFI_HOB_TYPE_RESOURCE_DESCRIPTOR)) {
       ResourceHob = Hob.ResourceDescriptor;
 
       if (ResourceHob->ResourceType == EFI_RESOURCE_SYSTEM_MEMORY) {
+        if (ResourceHob->PhysicalStart >= SIZE_4GB) {
+          ResourceHob->ResourceType = EFI_RESOURCE_MEMORY_UNACCEPTED;
+          continue;
+        }
         MemEncryptSevSnpPreValidateSystemRam (
           ResourceHob->PhysicalStart,
           EFI_SIZE_TO_PAGES ((UINTN)ResourceHob->ResourceLength)

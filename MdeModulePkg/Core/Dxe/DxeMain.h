@@ -62,6 +62,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <Guid/VectorHandoffTable.h>
 #include <Ppi/VectorHandoffInfo.h>
 #include <Guid/MemoryProfile.h>
+#include <Uefi/UefiSpec.h>
 
 #include <Library/DxeCoreEntryPoint.h>
 #include <Library/DebugLib.h>
@@ -282,6 +283,8 @@ extern EFI_RUNTIME_ARCH_PROTOCOL  gRuntimeTemplate;
 
 extern EFI_LOAD_FIXED_ADDRESS_CONFIGURATION_TABLE  gLoadModuleAtFixAddressConfigurationTable;
 extern BOOLEAN                                     gLoadFixedAddressCodeMemoryReady;
+
+extern BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE gBz3987DefaultMemoryMapFeatures;
 //
 // Service Initialization Functions
 //
@@ -1237,6 +1240,53 @@ CoreGetMemoryMap (
   OUT UINTN                     *MapKey,
   OUT UINTN                     *DescriptorSize,
   OUT UINT32                    *DescriptorVersion
+  );
+
+/**
+  This function returns a copy of the current memory map. The map is an array of
+  memory descriptors, each of which describes a contiguous block of memory.
+  Resolves unsupported features before returning the map.
+
+  @param  MemoryMapSize          A pointer to the size, in bytes, of the
+                                 MemoryMap buffer. On input, this is the size of
+                                 the buffer allocated by the caller.  On output,
+                                 it is the size of the buffer returned by the
+                                 firmware  if the buffer was large enough, or the
+                                 size of the buffer needed  to contain the map if
+                                 the buffer was too small.
+  @param  MemoryMapFeatures      A pointer to a sized struct that represents the
+                                 caller's memory type feature support.
+                                 Unsupported features will be resolved in this
+                                 call. If NULL, then all features are considered
+                                 supported.
+  @param  MemoryMap              A pointer to the buffer in which firmware places
+                                 the current memory map.
+  @param  MapKey                 A pointer to the location in which firmware
+                                 returns the key for the current memory map.
+  @param  DescriptorSize         A pointer to the location in which firmware
+                                 returns the size, in bytes, of an individual
+                                 EFI_MEMORY_DESCRIPTOR.
+  @param  DescriptorVersion      A pointer to the location in which firmware
+                                 returns the version number associated with the
+                                 EFI_MEMORY_DESCRIPTOR.
+
+  @retval EFI_SUCCESS            The memory map was returned in the MemoryMap
+                                 buffer.
+  @retval EFI_BUFFER_TOO_SMALL   The MemoryMap buffer was too small. The current
+                                 buffer size needed to hold the memory map is
+                                 returned in MemoryMapSize.
+  @retval EFI_INVALID_PARAMETER  One of the parameters has an invalid value.
+
+**/
+EFI_STATUS
+EFIAPI
+Bz3987CoreGetMemoryMapEx (
+  IN OUT UINTN                        *MemoryMapSize,
+  IN     BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE *MemoryMapFeatures,
+  IN OUT EFI_MEMORY_DESCRIPTOR        *MemoryMap,
+  OUT UINTN                           *MapKey,
+  OUT UINTN                           *DescriptorSize,
+  OUT UINT32                          *DescriptorVersion
   );
 
 /**

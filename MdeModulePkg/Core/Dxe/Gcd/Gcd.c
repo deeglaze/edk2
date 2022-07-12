@@ -2475,6 +2475,15 @@ CoreInitializeMemoryServices (
     Capabilities
     );
 
+  //
+  // Initialize a default set of features that this UEFI implementation supports
+  // for GetMemoryMapEx.
+  //
+  SetMem(&gBz3987DefaultMemoryMapFeatures, sizeof(gBz3987DefaultMemoryMapFeatures), 0);
+  gBz3987DefaultMemoryMapFeatures.Size = sizeof(gBz3987DefaultMemoryMapFeatures);
+  gBz3987DefaultMemoryMapFeatures.FeatureBitmap0 =
+   BZ3987_EFI_MEMORY_MAP_FEATURE0_UNACCEPTED_MEMORY;
+
   *MemoryBaseAddress = BaseAddress;
   *MemoryLength      = Length;
 

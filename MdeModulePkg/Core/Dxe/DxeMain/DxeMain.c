@@ -36,6 +36,11 @@ EFI_GUID                   *gDxeCoreFileName;
 EFI_LOADED_IMAGE_PROTOCOL  *gDxeCoreLoadedImage;
 
 //
+// Default memory map features that this UEFI implementation supports.
+//
+BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE gBz3987DefaultMemoryMapFeatures;
+
+//
 // DXE Core Module Variables
 //
 EFI_BOOT_SERVICES  mBootServices = {
@@ -89,7 +94,8 @@ EFI_BOOT_SERVICES  mBootServices = {
   (EFI_CALCULATE_CRC32)CoreEfiNotAvailableYetArg3,                                        // CalculateCrc32
   (EFI_COPY_MEM)CopyMem,                                                                  // CopyMem
   (EFI_SET_MEM)SetMem,                                                                    // SetMem
-  (EFI_CREATE_EVENT_EX)CoreCreateEventEx                                                  // CreateEventEx
+  (EFI_CREATE_EVENT_EX)CoreCreateEventEx,                                                 // CreateEventEx
+  (BZ3987_EFI_GET_MEMORY_MAP_EX)Bz3987CoreGetMemoryMapEx,                                 // GetMemoryMapEx
 };
 
 EFI_DXE_SERVICES  mDxeServices = {

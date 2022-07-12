@@ -206,11 +206,11 @@ ShellCommandRunMemMap (
       ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_GEN_TOO_MANY), gShellDebug1HiiHandle, L"memmap");
       ShellStatus = SHELL_INVALID_PARAMETER;
     } else {
-      Status = gBS->GetMemoryMap (&Size, Descriptors, &MapKey, &ItemSize, &Version);
+      Status = gBS->Bz3987GetMemoryMapEx (&Size, NULL, Descriptors, &MapKey, &ItemSize, &Version);
       if (Status == EFI_BUFFER_TOO_SMALL) {
         Size       += SIZE_1KB;
         Descriptors = AllocateZeroPool (Size);
-        Status      = gBS->GetMemoryMap (&Size, Descriptors, &MapKey, &ItemSize, &Version);
+        Status      = gBS->Bz3987GetMemoryMapEx (&Size, NULL, Descriptors, &MapKey, &ItemSize, &Version);
       }
 
       if (EFI_ERROR (Status)) {

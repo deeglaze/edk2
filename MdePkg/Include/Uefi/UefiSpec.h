@@ -158,6 +158,23 @@ typedef struct {
   UINT64                  Attribute;
 } EFI_MEMORY_DESCRIPTOR;
 
+///
+/// Definition of the memory map features struct.
+///
+typedef struct {
+  ///
+  /// The size of this struct. If Size < the size of this struct, then data
+  /// between Size of the size of this struct are treated as zeroes.
+  ///
+  UINT32 Size;
+  ///
+  /// A bitmap of feature support. Bits 63:1 are reserved mbz.
+  ///
+  UINT64 FeatureBitmap0;
+} BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE;
+
+#define BZ3987_EFI_MEMORY_MAP_FEATURE0_UNACCEPTED_MEMORY 1
+
 /**
   Allocates memory pages from the system.
 
@@ -211,7 +228,7 @@ EFI_STATUS
   );
 
 /**
-  Returns the current memory map.
+  Returns the current memory map with no features enabled.
 
   @param[in, out]  MemoryMapSize         A pointer to the size, in bytes, of the MemoryMap buffer.
                                          On input, this is the size of the buffer allocated by the caller.
@@ -243,6 +260,46 @@ EFI_STATUS
   OUT    UINTN                       *MapKey,
   OUT    UINTN                       *DescriptorSize,
   OUT    UINT32                      *DescriptorVersion
+  );
+
+/**
+  Returns the current memory map after negotiating features with the caller.
+
+  @param[in, out]  MemoryMapSize         A pointer to the size, in bytes, of the MemoryMap buffer.
+                                         On input, this is the size of the buffer allocated by the caller.
+                                         On output, it is the size of the buffer returned by the firmware if
+                                         the buffer was large enough, or the size of the buffer needed to contain
+                                         the map if the buffer was too small.
+  @param[in]       MemoryMapFeatures     A pointer to a sized struct that represents the caller's
+                                         memory type feature support. Unsupported features will
+                                         be resolved in this call. If NULL, then all features are considered
+                                         supported.
+  @param[out]      MemoryMap             A pointer to the buffer in which firmware places the current memory
+                                         map.
+  @param[out]      MapKey                A pointer to the location in which firmware returns the key for the
+                                         current memory map.
+  @param[out]      DescriptorSize        A pointer to the location in which firmware returns the size, in bytes, of
+                                         an individual EFI_MEMORY_DESCRIPTOR.
+  @param[out]      DescriptorVersion     A pointer to the location in which firmware returns the version number
+                                         associated with the EFI_MEMORY_DESCRIPTOR.
+
+  @retval EFI_SUCCESS           The memory map was returned in the MemoryMap buffer.
+  @retval EFI_BUFFER_TOO_SMALL  The MemoryMap buffer was too small. The current buffer size
+                                needed to hold the memory map is returned in MemoryMapSize.
+  @retval EFI_INVALID_PARAMETER 1) MemoryMapSize is NULL.
+                                2) The MemoryMap buffer is not too small and MemoryMap is
+                                   NULL.
+
+**/
+typedef
+EFI_STATUS
+(EFIAPI *BZ3987_EFI_GET_MEMORY_MAP_EX)(
+  IN OUT UINTN                        *MemoryMapSize,
+  IN     BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE *MemoryMapFeatures,
+  OUT    EFI_MEMORY_DESCRIPTOR        *MemoryMap,
+  OUT    UINTN                        *MapKey,
+  OUT    UINTN                        *DescriptorSize,
+  OUT    UINT32                       *DescriptorVersion
   );
 
 /**
@@ -1953,6 +2010,7 @@ typedef struct {
   EFI_COPY_MEM                                  CopyMem;
   EFI_SET_MEM                                   SetMem;
   EFI_CREATE_EVENT_EX                           CreateEventEx;
+  BZ3987_EFI_GET_MEMORY_MAP_EX                  Bz3987GetMemoryMapEx;
 } EFI_BOOT_SERVICES;
 
 ///

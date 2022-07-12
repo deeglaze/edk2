@@ -1233,8 +1233,9 @@ GetUefiMemoryMap (
 
   UefiMemoryMapSize = 0;
   MemoryMap         = NULL;
-  Status            = gBS->GetMemoryMap (
+  Status            = gBS->Bz3987GetMemoryMapEx (
                              &UefiMemoryMapSize,
+                             NULL,
                              MemoryMap,
                              &MapKey,
                              &mUefiDescriptorSize,
@@ -1249,8 +1250,9 @@ GetUefiMemoryMap (
       return;
     }
 
-    Status = gBS->GetMemoryMap (
+    Status = gBS->Bz3987GetMemoryMapEx (
                     &UefiMemoryMapSize,
+                    NULL,
                     MemoryMap,
                     &MapKey,
                     &mUefiDescriptorSize,

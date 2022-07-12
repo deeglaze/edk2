@@ -6,6 +6,8 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
+#include <Protocol/MemoryAccept.h>
+#include <Uefi/UefiSpec.h>
 #include "DxeMain.h"
 #include "Imem.h"
 #include "HeapGuard.h"
@@ -377,6 +379,69 @@ CoreFreeMemoryMapStack (
 
   mFreeMapStack -= 1;
 }
+
+/**
+   Accepts and converts unaccepted memory ranges into system memory ranges.
+   Assumes the caller holds the GcdMemoryLock.
+ **/
+STATIC
+EFI_STATUS
+CoreAcceptAllUnacceptedMemory (
+  VOID
+  )
+{
+#ifdef MDE_CPU_X64
+  LIST_ENTRY                  *Link;
+  EFI_GCD_MAP_ENTRY           *GcdEntry;
+  EFI_MEMORY_ACCEPT_PROTOCOL  *MemoryAcceptProtocol;
+  EFI_STATUS                  Status;
+  UINT64                      Size;
+
+  Status = gBS->LocateProtocol (&gEfiMemoryAcceptProtocolGuid, NULL, (VOID **)&MemoryAcceptProtocol);
+  if (EFI_ERROR (Status)) {
+    return EFI_UNSUPPORTED;
+  }
+  //
+  // Traverse the mGcdMemorySpaceMap to accept all unaccepted
+  // memory entries.
+  //
+  Link = mGcdMemorySpaceMap.ForwardLink;
+  while (Link != &mGcdMemorySpaceMap) {
+    GcdEntry = CR (Link, EFI_GCD_MAP_ENTRY, Link, EFI_GCD_MAP_SIGNATURE);
+    if (GcdEntry->GcdMemoryType == EfiGcdMemoryTypeUnaccepted) {
+      //
+      // Accept memory using the interface provide by the protocol.
+      //
+      Size = GcdEntry->EndAddress - GcdEntry->BaseAddress + 1;
+      Status = MemoryAcceptProtocol->AcceptMemory (
+        MemoryAcceptProtocol,
+        GcdEntry->BaseAddress,
+        Size
+        );
+
+      if (EFI_ERROR (Status)) {
+        return Status;
+      }
+
+      CoreRemoveMemorySpace(GcdEntry->BaseAddress, Size);
+      CoreAddMemorySpace (
+        EfiGcdMemoryTypeSystemMemory,
+        GcdEntry->BaseAddress,
+        Size,
+        //
+        // Hardcode memory space attributes.
+        //
+        EFI_MEMORY_CPU_CRYPTO | EFI_MEMORY_XP | EFI_MEMORY_RO | EFI_MEMORY_RP
+      );
+    }
+
+    Link = Link->ForwardLink;
+  }
+#endif
+
+  return EFI_SUCCESS;
+}
+
 
 /**
   Find untested but initialized memory regions in GCD map and convert them to be DXE allocatable.
@@ -1716,6 +1781,11 @@ MergeMemoryMapDescriptor (
                                  firmware  if the buffer was large enough, or the
                                  size of the buffer needed  to contain the map if
                                  the buffer was too small.
+  @param  MemoryMapFeatures      A pointer to a sized struct that represents the
+                                 caller's memory type feature support.
+                                 Unsupported features will be resolved in this
+                                 call. If NULL, then all features are considered
+                                 supported.
   @param  MemoryMap              A pointer to the buffer in which firmware places
                                  the current memory map.
   @param  MapKey                 A pointer to the location in which firmware
@@ -1737,31 +1807,61 @@ MergeMemoryMapDescriptor (
 **/
 EFI_STATUS
 EFIAPI
-CoreGetMemoryMap (
-  IN OUT UINTN                  *MemoryMapSize,
-  IN OUT EFI_MEMORY_DESCRIPTOR  *MemoryMap,
-  OUT UINTN                     *MapKey,
-  OUT UINTN                     *DescriptorSize,
-  OUT UINT32                    *DescriptorVersion
+Bz3987CoreGetMemoryMapEx (
+  IN OUT UINTN                        *MemoryMapSize,
+  IN     BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE *MemoryMapFeatures,
+  IN OUT EFI_MEMORY_DESCRIPTOR        *MemoryMap,
+  OUT UINTN                           *MapKey,
+  OUT UINTN                           *DescriptorSize,
+  OUT UINT32                          *DescriptorVersion
   )
 {
-  EFI_STATUS             Status;
-  UINTN                  Size;
-  UINTN                  BufferSize;
-  UINTN                  NumberOfEntries;
-  LIST_ENTRY             *Link;
-  MEMORY_MAP             *Entry;
-  EFI_GCD_MAP_ENTRY      *GcdMapEntry;
-  EFI_GCD_MAP_ENTRY      MergeGcdMapEntry;
-  EFI_MEMORY_TYPE        Type;
-  EFI_MEMORY_DESCRIPTOR  *MemoryMapStart;
-  EFI_MEMORY_DESCRIPTOR  *MemoryMapEnd;
+  EFI_STATUS                   Status;
+  UINTN                        Size;
+  UINTN                        BufferSize;
+  UINTN                        NumberOfEntries;
+  LIST_ENTRY                   *Link;
+  MEMORY_MAP                   *Entry;
+  EFI_GCD_MAP_ENTRY            *GcdMapEntry;
+  EFI_GCD_MAP_ENTRY            MergeGcdMapEntry;
+  EFI_MEMORY_TYPE              Type;
+  EFI_MEMORY_DESCRIPTOR        *MemoryMapStart;
+  EFI_MEMORY_DESCRIPTOR        *MemoryMapEnd;
+  BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE Features;
 
   //
   // Make sure the parameters are valid
   //
   if (MemoryMapSize == NULL) {
     return EFI_INVALID_PARAMETER;
+  }
+
+  Size = sizeof (EFI_MEMORY_DESCRIPTOR);
+
+  //
+  // Make sure Size != sizeof(EFI_MEMORY_DESCRIPTOR). This will
+  // prevent people from having pointer math bugs in their code.
+  // now you have to use *DescriptorSize to make things work.
+  //
+  Size += sizeof (UINT64) - (Size % sizeof (UINT64));
+
+  SetMem(&Features, sizeof(Features), 0);
+  if (MemoryMapFeatures != NULL) {
+    CopyMem(&Features, MemoryMapFeatures,
+            MIN(sizeof(Features), MemoryMapFeatures->Size));
+  } else {
+    CopyMem(&Features, &gBz3987DefaultMemoryMapFeatures, sizeof(Features));
+  }
+
+  // Accept all unaccepted memory if unaccepted memory is not a supported
+  // feature.
+  if (!(Features.FeatureBitmap0 & BZ3987_EFI_MEMORY_MAP_FEATURE0_UNACCEPTED_MEMORY)) {
+    // Change all unaccepted memory regions to system memory regions after
+    // accepting them.
+    Status = CoreAcceptAllUnacceptedMemory();
+    if (EFI_ERROR(Status)) {
+      return Status;
+    }
   }
 
   CoreAcquireGcdMemoryLock ();
@@ -1781,15 +1881,6 @@ CoreGetMemoryMap (
       NumberOfEntries++;
     }
   }
-
-  Size = sizeof (EFI_MEMORY_DESCRIPTOR);
-
-  //
-  // Make sure Size != sizeof(EFI_MEMORY_DESCRIPTOR). This will
-  // prevent people from having pointer math bugs in their code.
-  // now you have to use *DescriptorSize to make things work.
-  //
-  Size += sizeof (UINT64) - (Size % sizeof (UINT64));
 
   if (DescriptorSize != NULL) {
     *DescriptorSize = Size;
@@ -2037,6 +2128,57 @@ Done:
     );
 
   return Status;
+}
+
+/**
+  This function returns a copy of the current memory map. The map is an array of
+  memory descriptors, each of which describes a contiguous block of memory.
+
+  @param  MemoryMapSize          A pointer to the size, in bytes, of the
+                                 MemoryMap buffer. On input, this is the size of
+                                 the buffer allocated by the caller.  On output,
+                                 it is the size of the buffer returned by the
+                                 firmware  if the buffer was large enough, or the
+                                 size of the buffer needed  to contain the map if
+                                 the buffer was too small.
+  @param  MemoryMap              A pointer to the buffer in which firmware places
+                                 the current memory map.
+  @param  MapKey                 A pointer to the location in which firmware
+                                 returns the key for the current memory map.
+  @param  DescriptorSize         A pointer to the location in which firmware
+                                 returns the size, in bytes, of an individual
+                                 EFI_MEMORY_DESCRIPTOR.
+  @param  DescriptorVersion      A pointer to the location in which firmware
+                                 returns the version number associated with the
+                                 EFI_MEMORY_DESCRIPTOR.
+
+  @retval EFI_SUCCESS            The memory map was returned in the MemoryMap
+                                 buffer.
+  @retval EFI_BUFFER_TOO_SMALL   The MemoryMap buffer was too small. The current
+                                 buffer size needed to hold the memory map is
+                                 returned in MemoryMapSize.
+  @retval EFI_INVALID_PARAMETER  One of the parameters has an invalid value.
+
+**/
+EFI_STATUS
+EFIAPI
+CoreGetMemoryMap (
+  IN OUT UINTN                           *MemoryMapSize,
+  IN OUT EFI_MEMORY_DESCRIPTOR           *MemoryMap,
+  OUT UINTN                              *MapKey,
+  OUT UINTN                              *DescriptorSize,
+   OUT UINT32                            *DescriptorVersion
+)
+{
+  BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE ZeroFeatures;
+  SetMem(&ZeroFeatures, sizeof(ZeroFeatures), 0);
+  return Bz3987CoreGetMemoryMapEx(
+    MemoryMapSize,
+    &ZeroFeatures,
+    MemoryMap,
+    MapKey,
+    DescriptorSize,
+    DescriptorVersion);
 }
 
 /**

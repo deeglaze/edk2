@@ -485,8 +485,9 @@ SmmLibInternalEndOfDxeNotify (
 
   MemoryMapSize = 0;
   MemoryMap     = NULL;
-  Status        = gBS->GetMemoryMap (
+  Status        = gBS->GetMemoryMapEx (
                          &MemoryMapSize,
+                         NULL,
                          MemoryMap,
                          &MapKey,
                          &DescriptorSize,
@@ -498,8 +499,9 @@ SmmLibInternalEndOfDxeNotify (
     Status = gBS->AllocatePool (EfiBootServicesData, MemoryMapSize, (VOID **)&MemoryMap);
     ASSERT (MemoryMap != NULL);
 
-    Status = gBS->GetMemoryMap (
+    Status = gBS->GetMemoryMapEx (
                     &MemoryMapSize,
+                    NULL,
                     MemoryMap,
                     &MapKey,
                     &DescriptorSize,

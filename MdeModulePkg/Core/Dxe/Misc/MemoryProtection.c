@@ -801,8 +801,9 @@ InitializeDxeNxMemoryProtectionPolicy (
   MemoryMapSize = 0;
   MemoryMap     = NULL;
 
-  Status = gBS->GetMemoryMap (
+  Status = gBS->Bz3987GetMemoryMapEx (
                   &MemoryMapSize,
+                  NULL,
                   MemoryMap,
                   &MapKey,
                   &DescriptorSize,
@@ -812,8 +813,9 @@ InitializeDxeNxMemoryProtectionPolicy (
   do {
     MemoryMap = (EFI_MEMORY_DESCRIPTOR *)AllocatePool (MemoryMapSize);
     ASSERT (MemoryMap != NULL);
-    Status = gBS->GetMemoryMap (
+    Status = gBS->Bz3987GetMemoryMapEx (
                     &MemoryMapSize,
+                    NULL,
                     MemoryMap,
                     &MapKey,
                     &DescriptorSize,

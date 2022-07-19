@@ -572,6 +572,7 @@ BdsFormalizeOSIndicationVariable (
     OsIndicationSupport = 0;
   }
 
+  OsIndicationSupport |= BZ3987_EFI_OS_INDICATIONS_UNACCEPTED_MEMORY_SUPPORTED;
   if (PcdGetBool (PcdPlatformRecoverySupport)) {
     OsIndicationSupport |= EFI_OS_INDICATIONS_START_PLATFORM_RECOVERY;
   }
@@ -630,6 +631,13 @@ BdsFormalizeOSIndicationVariable (
     // Deleting variable with current variable implementation shouldn't fail.
     //
     ASSERT_EFI_ERROR (Status);
+  }
+
+  // Inform GetMemoryMap that unaccepted memory support should override input features.
+  if ((OsIndication & BZ3987_EFI_OS_INDICATIONS_UNACCEPTED_MEMORY_SUPPORTED) != 0) {
+    Status = PcdSetBoolS(PcdUnacceptedMemory, TRUE);
+    // Setting this Pcd shouldn't fail.
+    ASSERT_EFI_ERROR(Status);
   }
 }
 

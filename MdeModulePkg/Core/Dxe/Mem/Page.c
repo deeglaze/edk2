@@ -1770,6 +1770,15 @@ MergeMemoryMapDescriptor (
   return NEXT_MEMORY_DESCRIPTOR (MemoryMapDescriptor, DescriptorSize);
 }
 
+static
+BOOLEAN
+UnacceptedMemorySupported (
+    IN BZ3987_EFI_MEMORY_MAP_FEATURES_TYPE *Features
+  ) {
+  return ((Features->FeatureBitmap0 & BZ3987_EFI_MEMORY_MAP_FEATURE0_UNACCEPTED_MEMORY) != 0) ||
+      PcdGetBool(PcdUnacceptedMemory);
+}
+
 /**
   This function returns a copy of the current memory map. The map is an array of
   memory descriptors, each of which describes a contiguous block of memory.
@@ -1855,7 +1864,7 @@ Bz3987CoreGetMemoryMapEx (
 
   // Accept all unaccepted memory if unaccepted memory is not a supported
   // feature.
-  if (!(Features.FeatureBitmap0 & BZ3987_EFI_MEMORY_MAP_FEATURE0_UNACCEPTED_MEMORY)) {
+  if (!UnacceptedMemorySupported(&Features)) {
     // Change all unaccepted memory regions to system memory regions after
     // accepting them.
     Status = CoreAcceptAllUnacceptedMemory();

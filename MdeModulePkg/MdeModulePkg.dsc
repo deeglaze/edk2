@@ -211,6 +211,7 @@
 
 [PcdsDynamicExDefault]
   gEfiMdeModulePkgTokenSpaceGuid.PcdRecoveryFileName|L"FVMAIN.FV"
+  gEfiMdeModulePkgTokenSpaceGuid.PcdUnacceptedMemory|FALSE
 
 [Components]
   MdeModulePkg/Application/HelloWorld/HelloWorld.inf

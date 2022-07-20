@@ -80,6 +80,7 @@
   gEfiSimpleTextInputExProtocolGuid             ## CONSUMES
   gEdkiiVariablePolicyProtocolGuid              ## SOMETIMES_CONSUMES
   gEfiDeferredImageLoadProtocolGuid             ## CONSUMES
+  gEfiMemoryAcceptProtocolGuid                  ## SOMETIMES_CONSUMES
 
 [FeaturePcd]
   gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultLangDeprecate    ## CONSUMES

@@ -15,7 +15,9 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "Bds.h"
 #include "Language.h"
 #include "HwErrRecSupport.h"
+#include <Library/DxeServicesTableLib.h>
 #include <Library/VariablePolicyHelperLib.h>
+#include <Protocol/MemoryAccept.h>
 
 #define SET_BOOT_OPTION_SUPPORT_KEY_COUNT(a, c)  { \
       (a) = ((a) & ~EFI_BOOT_OPTION_SUPPORT_COUNT) | (((c) << LowBitSet32 (EFI_BOOT_OPTION_SUPPORT_COUNT)) & EFI_BOOT_OPTION_SUPPORT_COUNT); \
@@ -50,6 +52,8 @@ CHAR16  *mBdsLoadOptionName[] = {
   L"Boot",
   L"PlatformRecovery"
 };
+
+static UINT64 mOsIndications = 0;
 
 /**
   Event to Connect ConIn.
@@ -572,6 +576,7 @@ BdsFormalizeOSIndicationVariable (
     OsIndicationSupport = 0;
   }
 
+  OsIndicationSupport |= BZ3987_EFI_OS_INDICATIONS_UNACCEPTED_MEMORY_SUPPORTED;
   if (PcdGetBool (PcdPlatformRecoverySupport)) {
     OsIndicationSupport |= EFI_OS_INDICATIONS_START_PLATFORM_RECOVERY;
   }
@@ -631,6 +636,7 @@ BdsFormalizeOSIndicationVariable (
     //
     ASSERT_EFI_ERROR (Status);
   }
+  mOsIndications = OsIndication
 }
 
 /**
@@ -654,6 +660,86 @@ BdsFormalizeEfiGlobalVariable (
   // Validate OSIndication related variable.
   //
   BdsFormalizeOSIndicationVariable ();
+}
+
+STATIC
+EFI_STATUS
+AcceptAllUnacceptedMemory (
+  IN EFI_MEMORY_ACCEPT_PROTOCOL *AcceptMemory
+  )
+{
+  EFI_GCD_MEMORY_SPACE_DESCRIPTOR  *AllDescMap;
+  UINTN                            NumEntries;
+  UINTN                            Index;
+  EFI_STATUS                       Status;
+
+  DEBUG((DEBUG_INFO, "Accepting all unaccepted memory\n"));
+  Status = gDS->GetMemorySpaceMap (&NumEntries, &AllDescMap);
+  if (EFI_ERROR (Status)) {
+    DEBUG((DEBUG_INFO, "GetMemorySpaceMap problem\n"));
+    return Status;
+  }
+  for (Index = 0; Index < NumEntries; Index++) {
+    CONST EFI_GCD_MEMORY_SPACE_DESCRIPTOR  *Desc;
+
+    Desc = &AllDescMap[Index];
+    if (Desc->GcdMemoryType != EfiGcdMemoryTypeUnaccepted) {
+      continue;
+    }
+
+    Status = AcceptMemory->AcceptMemory (
+      AcceptMemory,
+      Desc->BaseAddress,
+      Desc->Length
+      );
+    if (EFI_ERROR(Status)) {
+      goto done;
+    }
+
+    Status = gDS->RemoveMemorySpace(Desc->BaseAddress, Desc->Length);
+    if (EFI_ERROR(Status)) {
+      goto done;
+    }
+
+    Status = gDS->AddMemorySpace (
+      EfiGcdMemoryTypeSystemMemory,
+      Desc->BaseAddress,
+      Desc->Length,
+      EFI_MEMORY_CPU_CRYPTO | EFI_MEMORY_XP | EFI_MEMORY_RO | EFI_MEMORY_RP
+      );
+    if (EFI_ERROR(Status)) {
+      goto done;
+    }
+  }
+
+done:
+  FreePool (AllDescMap);
+  return Status;
+}
+
+EFI_STATUS
+EFIAPI
+BdsResolveUnacceptedMemory (
+  VOID
+  )
+{
+  EFI_MEMORY_ACCEPT_PROTOCOL *AcceptMemory;
+  EFI_STATUS                 Status;
+
+  if ((mOsIndications & BZ3987_EFI_OS_INDICATIONS_UNACCEPTED_MEMORY_SUPPORTED) != 0) {
+    return EFI_SUCCESS;
+  }
+
+  Status = gBS->LocateProtocol (&gEfiMemoryAcceptProtocolGuid, NULL,
+    (VOID **)&AcceptMemory);
+  if (Status == EFI_NOT_FOUND) {
+    return EFI_SUCCESS;
+  }
+  if (Status != EFI_SUCCESS) {
+    return EFI_UNSUPPORTED;
+  }
+
+  return AcceptAllUnacceptedMemory(AcceptMemory);
 }
 
 /**
@@ -721,6 +807,11 @@ BdsEntry (
   // Validate Variable.
   //
   BdsFormalizeEfiGlobalVariable ();
+
+  //
+  // Accept unaccepted memory if OsIndications doesn't show support.
+  //
+  BdsResolveUnacceptedMemory();
 
   //
   // Mark the read-only variables if the Variable Lock protocol exists

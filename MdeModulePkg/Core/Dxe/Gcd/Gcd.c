@@ -2523,6 +2523,9 @@ CoreInitializeGcdServices (
   UINT64                           Capabilities;
   EFI_HOB_CPU                      *CpuHob;
   EFI_GCD_MEMORY_SPACE_DESCRIPTOR  *MemorySpaceMapHobList;
+  UINT64                           OsIndications;
+  UINTN                            DataSize;
+  UINT32                           Attributes;
 
   //
   // Cache the PHIT HOB for later use
@@ -2604,6 +2607,7 @@ CoreInitializeGcdServices (
           break;
         case EFI_RESOURCE_MEMORY_UNACCEPTED:
           GcdMemoryType = EfiGcdMemoryTypeUnaccepted;
+          break;
         case EFI_RESOURCE_IO:
           GcdIoType = EfiGcdIoTypeIo;
           break;

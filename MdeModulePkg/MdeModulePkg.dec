@@ -677,6 +677,9 @@
   ## Include/Protocol/VariablePolicy.h
   gEdkiiVariablePolicyProtocolGuid = { 0x81D1675C, 0x86F6, 0x48DF, { 0xBD, 0x95, 0x9A, 0x6E, 0x4F, 0x09, 0x25, 0xC3 } }
 
+  ## Include/Protocol/ExitBootServicesCallback.h
+  gEdkiiExitBootServicesCallbackProtocolGuid = { 0xf5684799, 0x9a33, 0x40f7, {0xa1, 0x5c, 0x10, 0x8e, 0x0e, 0x6b, 0x45, 0x25 }}
+
 [PcdsFeatureFlag]
   ## Indicates if the platform can support update capsule across a system reset.<BR><BR>
   #   TRUE  - Supports update capsule across a system reset.<BR>

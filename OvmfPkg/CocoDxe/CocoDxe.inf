@@ -42,4 +42,5 @@
   gEfiEventBeforeExitBootServicesGuid
 
 [Protocols]
+  gBz3987AcceptAllUnacceptedMemoryProtocolGuid
   gEfiMemoryAcceptProtocolGuid

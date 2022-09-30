@@ -39,5 +39,6 @@
   TRUE
 
 [Protocols]
+  gBz3987AcceptAllUnacceptedMemoryProtocolGuid
   gEdkiiExitBootServicesCallbackProtocolGuid
   gEfiMemoryAcceptProtocolGuid

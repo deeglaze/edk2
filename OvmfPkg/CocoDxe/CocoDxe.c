@@ -16,6 +16,7 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/MemEncryptSevLib.h>
 #include <Library/MemEncryptTdxLib.h>
+#include <Protocol/Bz3987AcceptAllUnacceptedMemory.h>
 #include <Protocol/ExitBootServicesCallback.h>
 #include <Protocol/MemoryAccept.h>
 
@@ -113,6 +114,21 @@ STATIC EDKII_EXIT_BOOT_SERVICES_CALLBACK_PROTOCOL mExitBootServicesCallbackProco
   FALSE,
 };
 
+STATIC
+EFI_STATUS
+EFIAPI
+DisableAcceptAllUnacceptedMemory (
+  IN  BZ3987_ACCEPT_ALL_UNACCEPTED_MEMORY_PROTOCOL  *This
+  )
+{
+  mExitBootServicesCallbackProcotol.Disabled = TRUE;
+  return EFI_SUCCESS;
+}
+
+STATIC
+BZ3987_ACCEPT_ALL_UNACCEPTED_MEMORY_PROTOCOL
+mAcceptAllUnacceptedMemoryProtocol = {DisableAcceptAllUnacceptedMemory};
+
 EFI_STATUS
 EFIAPI
 CocoDxeEntryPoint (
@@ -138,6 +154,15 @@ CocoDxeEntryPoint (
                   );
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "Install EdkiiExitBootServicesCallbackProtocol failed.\n"));
+  }
+
+  Status = gBS->InstallProtocolInterface (&mCocoDxeHandle,
+                  &gBz3987AcceptAllUnacceptedMemoryProtocolGuid,
+                  EFI_NATIVE_INTERFACE,
+                  &mAcceptAllUnacceptedMemoryProtocol
+                  );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "Install Bz3987AcceptAllUnacceptedMemoryProtocol failed.\n"));
   }
 
   return EFI_SUCCESS;

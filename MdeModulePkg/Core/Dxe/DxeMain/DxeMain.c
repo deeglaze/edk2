@@ -745,6 +745,34 @@ CalculateEfiHdrCrc (
 }
 
 /**
+  Invokes TerminateMemoryMapPrehook from the first located instance of
+  EdkiiExitBootServicesProtocol.
+**/
+STATIC
+EFI_STATUS
+InvokeTerminateMemoryMapPrehooks (
+  VOID
+  )
+{
+  EFI_STATUS  Status;
+  EDKII_EXIT_BOOT_SERVICES_CALLBACK_PROTOCOL *Callback;
+
+  Status = gBS->LocateHandle (
+                  &gEdkiiExitBootServicesCallbackProtocolGuid,
+                  NULL,
+                  (VOID**)Callback
+                  );
+  if (Status == EFI_NOT_FOUND) {
+    return EFI_SUCCESS;
+  }
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+
+  return Callback->TerminateMemoryMapPrehook(Callback);
+}
+
+/**
   Terminates all boot services.
 
   @param  ImageHandle            Handle that identifies the exiting image.
@@ -767,6 +795,19 @@ CoreExitBootServices (
   // Disable Timer
   //
   gTimer->SetTimerPeriod (gTimer, 0);
+
+  //
+  // Invoke all protocols installed for ExitBootServices prior to
+  // CoreTerminateMemoryMap.
+  //
+  Status = InvokeTerminateMemoryMapPrehooks();
+  if (EFI_ERROR (Status)) {
+    //
+    // Notify other drivers that ExitBootServices failed
+    //
+    CoreNotifySignalList (&gEventExitBootServicesFailedGuid);
+    return Status;
+  }
 
   //
   // Terminate memory services if the MapKey matches

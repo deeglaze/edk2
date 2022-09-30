@@ -153,6 +153,7 @@
   gEfiHiiPackageListProtocolGuid                ## SOMETIMES_PRODUCES
   gEfiSmmBase2ProtocolGuid                      ## SOMETIMES_CONSUMES
   gEdkiiPeCoffImageEmulatorProtocolGuid         ## SOMETIMES_CONSUMES
+  gEdkiiExitBootServicesCallbackProtocolGuid    ## CONSUMES
 
   # Arch Protocols
   gEfiBdsArchProtocolGuid                       ## CONSUMES

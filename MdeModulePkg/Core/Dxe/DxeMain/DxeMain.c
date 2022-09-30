@@ -6,6 +6,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
+#include <Protocol/ExitBootServicesCallback.h>
 #include "DxeMain.h"
 
 //
@@ -745,6 +746,54 @@ CalculateEfiHdrCrc (
 }
 
 /**
+  Invokes TerminateMemoryMapPrehook from every instance of the
+  EdkiiExitBootServicesProtocol.
+**/
+STATIC
+EFI_STATUS
+InvokeTerminateMemoryMapPrehooks (
+  VOID
+  )
+{
+  UINTN       NoHandles;
+  UINTN       Index;
+  EFI_HANDLE  *HandleBuffer;
+  EFI_STATUS  Status;
+  EDKII_EXIT_BOOT_SERVICES_CALLBACK_PROTOCOL *Callback;
+
+  Status = gBS->LocateHandleBuffer (
+                  ByProtocol,
+                  &gEdkiiExitBootServicesCallbackProtocolGuid,
+                  NULL,
+                  &NoHandles,
+                  &HandleBuffer
+                  );
+  if (EFI_ERROR (Status) && NoHandles == 0) {
+    return Status;
+  }
+
+  for (Index = 0; Index < NoHandles; Index++) {
+    Status = gBS->HandleProtocol (
+                    HandleBuffer[Index],
+                    &gEdkiiExitBootServicesCallbackProtocolGuid,
+                    (VOID **)&Callback
+                    );
+    if (EFI_ERROR (Status)) {
+      continue;
+    }
+
+    Status = Callback->TerminateMemoryMapPrehook(Callback);
+    if (EFI_ERROR (Status) || Status == EFI_WARN_STALE_DATA) {
+      goto done;
+    }
+  }
+
+done:
+  FreePool(HandleBuffer);
+  return Status;
+}
+
+/**
   Terminates all boot services.
 
   @param  ImageHandle            Handle that identifies the exiting image.
@@ -767,6 +816,19 @@ CoreExitBootServices (
   // Disable Timer
   //
   gTimer->SetTimerPeriod (gTimer, 0);
+
+  //
+  // Invoke all protocols installed for ExitBootServices prior to
+  // CoreTerminateMemoryMap.
+  //
+  Status = InvokeTerminateMemoryMapPrehooks();
+  if (EFI_ERROR (Status)) {
+    //
+    // Notify other drivers that ExitBootServices failed
+    //
+    CoreNotifySignalList (&gEventExitBootServicesFailedGuid);
+    return Status;
+  }
 
   //
   // Terminate memory services if the MapKey matches

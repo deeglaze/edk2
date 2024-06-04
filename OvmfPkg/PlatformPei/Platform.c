@@ -179,6 +179,50 @@ MiscInitializationForMicrovm (
   ASSERT_RETURN_ERROR (PcdStatus);
 }
 
+STATIC
+VOID
+PlatformIdInitialization (
+  IN EFI_PEI_SERVICES  **PeiServices
+  )
+{
+  FIRMWARE_CONFIG_ITEM  FdtItem;
+  UINTN                 FdtSize;
+  EFI_STATUS            Status;
+  VOID                  *Hob;
+
+  //
+  // The format of etc/sp800155evts is expected to be a sequence of
+  // EFI_GUID_HOB_TYPE HOBs, each of which contain event data in the form of
+  // tdTCG_Sp800_155_PlatformId_Event2 or tdTCG_Sp800_155_PlatformId_Event3.
+  //
+  // The allocated HOB has size large enough to accommodate all HOBs in the
+  // file, and the QemuFwCfgReadBytes will populate the HOB list with all
+  // provided contents. All HOBs must use the gTcg800155PlatformIdEventHobGuid
+  // GUID to be included in the event log.
+  //
+  Status = QemuFwCfgFindFile ("etc/sp800155evts", &FdtItem, &FdtSize);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_INFO, "%a: no etc/sp800155evts found in fw_cfg, skipping\n", __func__));
+    return;
+  }
+
+  // HOBs must be 8-byte-aligned.
+  ASSERT ((FdtSize & 7) == 0);
+
+  // gTcg800155PlatformIdEventHobGuid points to a GUID_HOB whose stored GUID
+  // needs to point to the list of GUID_HOBs and their event payloads.
+  Status = (*PeiServices)->CreateHob (
+                             PeiServices,
+                             EFI_HOB_TYPE_GUID_EXTENSION,
+                             FdtSize,
+                             &Hob
+                             );
+  ASSERT_EFI_ERROR (Status);
+
+  QemuFwCfgSelectItem (FdtItem);
+  QemuFwCfgReadBytes (FdtSize, Hob);
+}
+
 VOID
 MiscInitialization (
   IN EFI_HOB_PLATFORM_INFO  *PlatformInfoHob
@@ -363,6 +407,7 @@ InitializePlatform (
     MiscInitializationForMicrovm (PlatformInfoHob);
   } else {
     MiscInitialization (PlatformInfoHob);
+    PlatformIdInitialization (PeiServices);
   }
 
   IntelTdxInitialize ();
